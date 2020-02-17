@@ -1,4 +1,5 @@
 import numpy as np
+from time import sleep
 
 #
 # GLOBAL VARIABLES
@@ -15,6 +16,28 @@ class Node:
     def __init__(self, gameArray, steps):
         self.gameArray = gameArray
         self.steps = steps
+    
+    def __repr__(self):
+        return '( ' + str(self.gameArray) + ', ' + self.steps + ')'
+
+
+    def __str__(self):
+        return '( ' + str(self.gameArray) + ', ' + self.steps + ')'
+
+# Each Node stores the game array and the steps used to get there
+class NodeInformed:
+    def __init__(self, gameArray, steps, fValue):
+        self.gameArray = gameArray
+        self.steps = steps
+        self.fValue = fValue
+    
+    def __repr__(self):
+        return 'NI: ( ' + str(self.gameArray) + ', ' + self.steps + ', ' + str(self.fValue) + ')'
+
+
+    def __str__(self):
+        return '( ' + str(self.gameArray) + ', ' + self.steps + ', ' + str(self.fValue) + ')'
+
 
 #
 # COMMON FUNCTIONS : Used by all solution methods
@@ -219,28 +242,101 @@ def solveIDS(gameArray):
 
 
 # Heuristic One: Number of Tiles Out of Place
+# (Excluding Blank Tile)
 def h1(gameArray):
-    return (np.count_nonzero(gameArray==goalState))
+    totalMisplaced = 9 - sum(np.array(gameArray) == np.array(goalState))
+    if gameArray.index(0) != 4:
+        totalMisplaced -= 1
+    return totalMisplaced
 
-    
 # Heuristic Two: Sum of Manhatten Distance
 def h2(gameArray):
-    pass
+    sum = 0
+    for index,toCheck in enumerate(gameArray):
+        if (toCheck == 0):
+            continue
+        oldRow, oldCol = int(index/3), (index % 3)
+        goalIndex = goalState.index(toCheck)
+        goalRow, goalCol = int(goalIndex/3), (goalIndex % 3)
+        sum += abs(goalCol - oldCol) + abs(goalRow - oldRow)
+    return sum
+
+def nodeComparator(item):
+    return item.fValue
 
 # # # # # # # # # # # #
 #        Greedy       #
 # # # # # # # # # # # #
 
-def solveGreedy(gameArray):
-    print('Using Greedy')
+def expandNodeGreedy(nodeList, heuristic):
+    global numNodesVisited
+
+    numNodesVisited += 1
+    theNode = nodeList.pop(0)
+    movements = getPossibleMotions(theNode.gameArray)
+    for mov in movements:
+        newGameArray = makeMovement(list(theNode.gameArray), mov)
+        newNode = NodeInformed (newGameArray, theNode.steps + mov + ', ', heuristic(newGameArray))
+        nodeList.append(newNode)
+
+
+def solveGreedy(gameArray, heuristic):
+    root = NodeInformed(gameArray, '', heuristic(gameArray))
+    nodeList = [root]
+    while not winnerFound:
+        # Sort Node List
+        nodeList = sorted(nodeList, key=nodeComparator)
+        # Check if solution
+        if (nodeList[0].gameArray == goalState):
+            break
+        print(nodeList[0])
+        print('\n')
+        # Expand First Node
+        expandNodeGreedy (nodeList, heuristic)
+
+    winnerNode = nodeList[0]
+    print("WINNER FOUND")
+    winnerNode.steps = winnerNode.steps [:-2] # remove the last ', '
+    print ('Solution: ' + winnerNode.steps)
+    print ('Number of nodes visited: ' + str(numNodesVisited))
+    print ('Max Node List Size: ')
 
 # # # # # # # # # #
 #      A-STAR     #
 # # # # # # # # # #
 
-def solveAStar(gameArray):
-    print('Using A-STAR')
+def expandNodeAstar(nodeList, heuristic):
+    global numNodesVisited, nodesVisited
 
+    numNodesVisited += 1
+    theNode = nodeList.pop(0)
+    movements = getPossibleMotions(theNode.gameArray)
+    for mov in movements:
+        newGameArray = makeMovement(list(theNode.gameArray), mov)
+        if newGameArray in nodesVisited:
+            continue
+        nodesVisited.append(newGameArray)
+        newNode = NodeInformed (newGameArray, theNode.steps + mov + ', ', theNode.steps.count(',') + heuristic(newGameArray))
+        nodeList.append(newNode)
+
+def solveAStar(gameArray, heuristic):
+    root = NodeInformed(gameArray, '', heuristic(gameArray))
+    nodeList = [root]
+    while not winnerFound:
+        # Sort Node List
+        nodeList = sorted(nodeList, key=nodeComparator)
+        # Check if solution
+        if (nodeList[0].gameArray == goalState):
+            break
+        # Expand First Node
+        expandNodeAstar (nodeList, heuristic)
+
+    winnerNode = nodeList[0]
+    print("WINNER FOUND")
+    winnerNode.steps = winnerNode.steps [:-2] # remove the last ', '
+    print ('Solution: ' + winnerNode.steps)
+    print ('Number of nodes visited: ' + str(numNodesVisited))
+    print ('Max Node List Size: ')
 
 # Show menu and let user choose algorithm
 def chooseAlgoAndSolve (gameArray):
@@ -253,15 +349,15 @@ def chooseAlgoAndSolve (gameArray):
     elif (choice == 3):
         solveIDS(gameArray)
     elif (choice == 4):
-        solveGreedy(gameArray)
+        solveGreedy(gameArray, h1)
     elif (choice == 5):
-        solveAStar(gameArray)
+        solveAStar(gameArray, h2)
     else:
-        print ('Wrong Choice')    
+        print ('Wrong Choice')
 
 def inputGameArray():
     # Input the array using map
-    toReturn = list(map(int,input("\nEnter the game array: ").strip().split()))[:9] 
+    toReturn = list(map(int, input('Please enter initial game array: ').split()))
     return toReturn
 
 # Takes Lisp-Style input from user and executes required algorithm
@@ -280,9 +376,9 @@ def inputLispStyle():
     elif (algoType == 'ids'):
         solveIDS(gameArray)
     elif (algoType == 'greedy'):
-        solveGreedy(gameArray)
+        solveGreedy(gameArray, h2)
     elif (algoType == 'astar'):
-        solveAStar(gameArray)
+        solveAStar(gameArray, h1)
 
     
 
